@@ -6,6 +6,9 @@ from streamlit_chat import message
 from llama_index_utils import ReportPulseAssistent
 import json
 from prompts import REPORT_PROMPT
+from PyPDF2 import PdfReader
+from transformers import BertForSequenceClassification, BertTokenizer
+import torch
 
 st.set_page_config(
     page_title="Report Pulse",
@@ -76,6 +79,65 @@ styl = f"""
 </style>
 """
 st.markdown(styl, unsafe_allow_html=True)
+
+
+# Load the pre-trained BERT model and tokenizer
+model_name = 'bert-base-uncased'
+tokenizer = BertTokenizer.from_pretrained(model_name)
+model = BertForSequenceClassification.from_pretrained(model_name)
+
+if file_uploaded is not None:
+        # Define a function to predict severity from a text
+    def predict_severity(report_text):
+        # Tokenize the text
+        inputs = tokenizer(report_text, return_tensors='pt', truncation=True, padding=True)
+
+        # Perform inference to classify severity
+        outputs = model(**inputs)
+        logits = outputs.logits
+        predicted_class = torch.argmax(logits, dim=1).item()
+
+        # Map predicted class to severity label
+        severity_labels = ['Low', 'Medium', 'High']
+        predicted_severity = severity_labels[predicted_class]
+
+        return predicted_severity
+
+    def extract_text_from_pdf(pdf_file_path):
+        text = ''
+        pdf_reader = PdfReader(pdf_file_path)
+        for page in pdf_reader.pages:
+            text += page.extract_text()
+        return text
+
+    # Path to the PDF file
+    pdf_file_path = file_uploaded
+    # Extract text from the PDF file
+    pdf_text = extract_text_from_pdf(pdf_file_path)
+
+    # Get the severity prediction for the extracted text
+    severity_prediction = predict_severity(pdf_text)
+
+    # Replace the following line in your code
+    # print(f"Predicted Severity: {severity_prediction}")
+
+    # Use st.write to display the predicted severity in Streamlit
+    st.write(f"Predicted Severity: {severity_prediction}")
+    # Check the predicted severity and display the appropriate button in the sidebar
+    if severity_prediction == 'Low':
+        st.button('Low Severity Button')
+            # Code to run when the Low Severity button is clicked
+        st.write('Low Severity Button Clicked')
+    elif severity_prediction == 'Medium':
+        st.button('Medium Severity Button')
+            # Code to run when the Medium Severity button is clicked
+        st.write('Medium Severity Button Clicked')
+    elif severity_prediction == 'High':
+        st.button('High Severity Button')
+            # Code to run when the High Severity button is clicked
+        st.write('High Severity Button Clicked')
+
+   
 
 if file_uploaded is not None:
     
@@ -150,11 +212,13 @@ if file_uploaded is not None:
         cols = st.columns(len(reports))
         for col, record in zip(cols, reports):
             col.metric(record["Parameter"], record["Result"], str(record["variation"]))
+
+
             
     def upload_file(uploadedFile):
         
         # Save uploaded file to 'content' folder.
-        save_folder = '/app/reportsData/'
+        save_folder = '/'
         save_path = Path(save_folder, uploadedFile.name)
         
         with open(save_path, mode='wb') as w:
@@ -169,12 +233,17 @@ if file_uploaded is not None:
     
     st.sidebar.markdown(r_response)
     st.markdown("""---""")
+
+
+
+    
     st.sidebar.markdown(""" <br /><br />
                       :rotating_light: **{}** :rotating_light: <br />
                             {}
                             """.format(transl[lang]['caution'], transl[lang]['caution_message']), 
                             unsafe_allow_html=True
     )
+ 
     with st.spinner(transl[lang]["gen_report"]): 
         try:
             reports_response = reportPulseAgent.get_next_message(REPORT_PROMPT,lang=lang,prompt_type='report')
@@ -193,3 +262,5 @@ if file_uploaded is not None:
 
     st.text_input(transl[lang]['ask_question'],key="user_input", on_change=process_input)
     display_messages()
+
+    

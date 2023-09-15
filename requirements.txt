@@ -1,9 +1,11 @@
 streamlit
-# ml model dependencies
 openai
 streamlit-chat
 llama-index
 tiktoken
 langchain
-pypdf
+PyPDF2
+transformers
+torch
 redis
+pypdf
